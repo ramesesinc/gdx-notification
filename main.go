@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -9,6 +11,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
+
+var port = flag.Int("port", 8082, "port where gdx-notifier should run")
 
 var redisdb = redis.NewClient(&redis.Options{
 	Addr:     "localhost:6379",
@@ -24,7 +28,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func monitorHandler(w http.ResponseWriter, r *http.Request) {
+func subscriptionHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -46,7 +50,7 @@ func monitorHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func monitorCompletedHandler(w http.ResponseWriter, r *http.Request) {
+func publisherHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 	body, _ := ioutil.ReadAll(r.Body)
@@ -58,8 +62,10 @@ func monitorCompletedHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	flag.Parse()
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/gdx-notifier/subcribe/{id}", monitorHandler)
-	router.HandleFunc("/gdx-notifier/publish/{id}", monitorCompletedHandler).Methods("POST")
-	log.Fatal(http.ListenAndServe(":8082", router))
+	router.HandleFunc("/gdx-notifier/subcribe/{id}", subscriptionHandler)
+	router.HandleFunc("/gdx-notifier/publish/{id}", publisherHandler).Methods("POST")
+	host := fmt.Sprintf(":%d", *port)
+	log.Fatal(http.ListenAndServe(host, router))
 }
