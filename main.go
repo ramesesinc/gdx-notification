@@ -37,6 +37,8 @@ func subscriptionHandler(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 	id := vars["id"]
 	pubsub := redisdb.Subscribe(id)
+
+	defer pubsub.Close()
 	_, err = pubsub.Receive()
 	if err != nil {
 		log.Fatal(err)
@@ -45,7 +47,6 @@ func subscriptionHandler(w http.ResponseWriter, r *http.Request) {
 	ch := pubsub.Channel()
 	for msg := range ch {
 		conn.WriteMessage(websocket.TextMessage, []byte(msg.Payload))
-		pubsub.Close()
 		break
 	}
 }
@@ -64,7 +65,7 @@ func publisherHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Parse()
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/gdx-notifier/subcribe/{id}", subscriptionHandler)
+	router.HandleFunc("/gdx-notifier/subscribe/{id}", subscriptionHandler)
 	router.HandleFunc("/gdx-notifier/publish/{id}", publisherHandler).Methods("POST")
 	host := fmt.Sprintf(":%d", *port)
 	log.Fatal(http.ListenAndServe(host, router))
